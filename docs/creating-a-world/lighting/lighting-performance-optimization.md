@@ -1,626 +1,373 @@
-# Lighting Performance Optimization: Maximizing Quality and Frame Rate
+# Horizon Worlds Performance Optimization: Accurate Guide
 
-**Optimize your lighting systems for smooth performance across all devices while maintaining visual quality.** This guide covers advanced optimization techniques, performance monitoring, and troubleshooting common lighting issues.
+**Optimize your Horizon Worlds for smooth performance across VR, mobile, and web platforms.** This guide covers real performance monitoring tools, optimization techniques, and troubleshooting based on actual Horizon Worlds capabilities.
 
 **Creator Skill Level**
-Advanced
+Intermediate to Advanced
 
 **Recommended Background Knowledge**
-Understanding of lighting fundamentals and basic optimization concepts.
+Understanding of Horizon Worlds building fundamentals and basic optimization concepts.
 
 **Estimated Time to Complete**
-1-2 hours for optimization techniques, 30 minutes for troubleshooting
+1 hour for core optimization techniques, 30 minutes for mobile-specific optimizations
 
 ## Table of Contents
 
-1. [Performance Monitoring](#performance-monitoring)
-2. [Light Count Optimization](#light-count-optimization)
-3. [Shadow Optimization](#shadow-optimization)
-4. [Mobile Optimization](#mobile-optimization)
-5. [Troubleshooting Common Issues](#troubleshooting-common-issues)
+1. [Performance Monitoring with Real-time Metrics](#performance-monitoring-with-real-time-metrics)
+2. [Memory Management and Limits](#memory-management-and-limits)
+3. [Cross-Platform Optimization](#cross-platform-optimization)
+4. [Mobile and Web Optimization](#mobile-and-web-optimization)
+5. [Performance Troubleshooting](#performance-troubleshooting)
+6. [Best Practices](#best-practices)
 
-## Performance Monitoring
+## Performance Monitoring with Real-time Metrics
 
-Monitor your lighting performance to identify bottlenecks and optimize effectively.
+Horizon Worlds provides a built-in Real-time Metrics panel to monitor your world's performance.
 
-### Performance Metrics
+### **Accessing Real-time Metrics:**
 
-**Key Metrics to Track:**
-- **Frame Rate**: Target 60+ FPS on desktop, 30+ on mobile
-- **Draw Calls**: Minimize lighting-related draw calls
-- **Shadow Rendering**: Monitor shadow map generation time
-- **Light Count**: Track active lights in scene
-- **Memory Usage**: Monitor lighting system memory consumption
+**In VR:**
 
-**Performance Monitoring Script:**
-```typescript
-class LightingPerformanceMonitor extends Horizon.Component {
-    private frameCount: number = 0;
-    private lastTime: number = Date.now();
-    private fps: number = 0;
-    private lightCount: number = 0;
-    private shadowCount: number = 0;
-    
-    override start() {
-        this.startPerformanceMonitoring();
-    }
-    
-    private startPerformanceMonitoring() {
-        setInterval(() => {
-            this.updatePerformanceMetrics();
-        }, 1000); // Update every second
-    }
-    
-    private updatePerformanceMetrics() {
-        // Calculate FPS
-        const currentTime = Date.now();
-        const deltaTime = currentTime - this.lastTime;
-        this.fps = Math.round(1000 / deltaTime);
-        this.lastTime = currentTime;
-        
-        // Count lights and shadows
-        this.lightCount = this.countActiveLights();
-        this.shadowCount = this.countShadowCastingLights();
-        
-        // Log performance data
-        this.logPerformanceData();
-    }
-    
-    private countActiveLights(): number {
-        const lights = this.getLightsInScene();
-        return lights.filter(light => light.getIntensity() > 0).length;
-    }
-    
-    private countShadowCastingLights(): number {
-        const lights = this.getLightsInScene();
-        return lights.filter(light => light.getCastShadows()).length;
-    }
-    
-    private logPerformanceData() {
-        console.log(`Performance: FPS=${this.fps}, Lights=${this.lightCount}, Shadows=${this.shadowCount}`);
-        
-        // Warn if performance is poor
-        if (this.fps < 30) {
-            console.warn("Low frame rate detected. Consider reducing light count or shadow quality.");
-        }
-        
-        if (this.lightCount > 20) {
-            console.warn("High light count detected. Consider light culling or LOD.");
-        }
-    }
-}
-```
+1. Enable **Utilities** menu in Settings
+2. Open wrist menu and select **Real-time Metrics**
 
-## Light Count Optimization
+**On Web:**
 
-Manage the number of active lights to maintain performance.
+- Press **P** key to toggle metrics panel
 
-### Light Culling System
+**Not Available:**
 
-**Distance-Based Culling:**
-```typescript
-class LightCullingSystem extends Horizon.Component {
-    private lights: Horizon.LightGizmo[] = [];
-    private player: Horizon.Player;
-    private cullingDistance: number = 50.0;
-    
-    override start() {
-        this.lights = this.getLightsInScene();
-        this.player = Horizon.Player.getLocalPlayer();
-        this.startCulling();
-    }
-    
-    private startCulling() {
-        setInterval(() => {
-            this.updateLightCulling();
-        }, 500); // Check every 500ms
-    }
-    
-    private updateLightCulling() {
-        if (!this.player) return;
-        
-        const playerPos = this.player.getPosition();
-        
-        this.lights.forEach(light => {
-            const lightPos = light.getPosition();
-            const distance = playerPos.distance(lightPos);
-            
-            if (distance > this.cullingDistance) {
-                // Disable distant lights
-                light.setIntensity(0);
-            } else {
-                // Enable nearby lights with distance-based intensity
-                const intensityFactor = 1.0 - (distance / this.cullingDistance);
-                light.setIntensity(light.getIntensity() * intensityFactor);
-            }
-        });
-    }
-}
-```
+- Desktop editor (use VR or web for testing)
+- Mobile (testing must be done in VR or web)
 
-### Light LOD System
+### **Key Performance Metrics:**
 
-**Level of Detail for Lights:**
-```typescript
-class LightLODSystem extends Horizon.Component {
-    private lights: Horizon.LightGizmo[] = [];
-    private lodDistances: number[] = [20, 35, 50]; // Near, medium, far
-    
-    override start() {
-        this.lights = this.getLightsInScene();
-        this.startLODUpdates();
-    }
-    
-    private startLODUpdates() {
-        setInterval(() => {
-            this.updateLightLOD();
-        }, 1000); // Update every second
-    }
-    
-    private updateLightLOD() {
-        const player = Horizon.Player.getLocalPlayer();
-        if (!player) return;
-        
-        const playerPos = player.getPosition();
-        
-        this.lights.forEach(light => {
-            const distance = playerPos.distance(light.getPosition());
-            const lodLevel = this.getLODLevel(distance);
-            this.applyLODToLight(light, lodLevel);
-        });
-    }
-    
-    private getLODLevel(distance: number): number {
-        if (distance <= this.lodDistances[0]) return 0; // High detail
-        if (distance <= this.lodDistances[1]) return 1; // Medium detail
-        if (distance <= this.lodDistances[2]) return 2; // Low detail
-        return 3; // Disabled
-    }
-    
-    private applyLODToLight(light: Horizon.LightGizmo, lodLevel: number) {
-        switch (lodLevel) {
-            case 0: // High detail
-                light.setIntensity(light.getIntensity());
-                if (light instanceof Horizon.DirectionalLightGizmo) {
-                    light.setShadowResolution(2048);
-                    light.setShadowSoftness(0.5);
-                }
-                break;
-                
-            case 1: // Medium detail
-                light.setIntensity(light.getIntensity() * 0.8);
-                if (light instanceof Horizon.DirectionalLightGizmo) {
-                    light.setShadowResolution(1024);
-                    light.setShadowSoftness(0.8);
-                }
-                break;
-                
-            case 2: // Low detail
-                light.setIntensity(light.getIntensity() * 0.5);
-                if (light instanceof Horizon.DirectionalLightGizmo) {
-                    light.setShadowResolution(512);
-                    light.setShadowSoftness(1.0);
-                }
-                break;
-                
-            case 3: // Disabled
-                light.setIntensity(0);
-                break;
-        }
-    }
-}
-```
+| Metric         | Target            | Description                              |
+| -------------- | ----------------- | ---------------------------------------- |
+| **FPS**        | 72 (VR), 60 (Web) | Frames per second - most critical metric |
+| **CPU**        | <13.8ms (VR)      | CPU processing time per frame            |
+| **GPU**        | <13.8ms (VR)      | GPU rendering time per frame             |
+| **Memory**     | <6.25 GB          | Total memory usage (hard limit)          |
+| **Draw Calls** | Minimize          | Number of render batches                 |
+| **Vertices**   | Monitor           | Total vertices rendered per frame        |
+| **Physics**    | Monitor           | Physics simulation time                  |
+| **Scripting**  | Monitor           | TypeScript execution time                |
 
-## Shadow Optimization
+### **Application Space Warp (ASW):**
 
-Shadows are often the most performance-intensive aspect of lighting.
+- **ASW Value 0**: Off (normal performance targets)
+- **ASW Value 1**: On (doubles frame budget, relaxes targets)
+- Automatically enabled when **Frame Budget Boost** is on
+- Helps maintain smooth experience when performance drops
 
-### Shadow Quality Management
+### **Phase Sync Time:**
 
-**Adaptive Shadow Quality:**
-```typescript
-class ShadowOptimizer extends Horizon.Component {
-    private shadowCastingLights: Horizon.LightGizmo[] = [];
-    private performanceMode: string = "balanced";
-    
-    override start() {
-        this.shadowCastingLights = this.getShadowCastingLights();
-        this.setupShadowOptimization();
-    }
-    
-    private setupShadowOptimization() {
-        // Monitor performance and adjust shadow quality
-        setInterval(() => {
-            this.updateShadowQuality();
-        }, 2000); // Check every 2 seconds
-    }
-    
-    private updateShadowQuality() {
-        const fps = this.getCurrentFPS();
-        
-        if (fps < 30) {
-            this.setLowQualityShadows();
-        } else if (fps < 45) {
-            this.setMediumQualityShadows();
-        } else {
-            this.setHighQualityShadows();
-        }
-    }
-    
-    private setLowQualityShadows() {
-        this.shadowCastingLights.forEach(light => {
-            if (light instanceof Horizon.DirectionalLightGizmo) {
-                light.setShadowResolution(512);
-                light.setShadowDistance(30);
-                light.setShadowSoftness(1.0);
-            }
-        });
-    }
-    
-    private setMediumQualityShadows() {
-        this.shadowCastingLights.forEach(light => {
-            if (light instanceof Horizon.DirectionalLightGizmo) {
-                light.setShadowResolution(1024);
-                light.setShadowDistance(50);
-                light.setShadowSoftness(0.7);
-            }
-        });
-    }
-    
-    private setHighQualityShadows() {
-        this.shadowCastingLights.forEach(light => {
-            if (light instanceof Horizon.DirectionalLightGizmo) {
-                light.setShadowResolution(2048);
-                light.setShadowDistance(100);
-                light.setShadowSoftness(0.3);
-            }
-        });
-    }
-    
-    private getCurrentFPS(): number {
-        // Simplified FPS calculation
-        return 60; // Placeholder
-    }
-}
-```
+- **High value**: World performing well (generating frames faster than needed)
+- **0ms**: World struggling to maintain target FPS
+- Acts as performance buffer
 
-### Shadow Culling
+## Memory Management and Limits
 
-**Smart Shadow Management:**
-```typescript
-class ShadowCullingSystem extends Horizon.Component {
-    private shadowLights: Horizon.LightGizmo[] = [];
-    private maxShadowLights: number = 4; // Limit shadow-casting lights
-    
-    override start() {
-        this.shadowLights = this.getShadowCastingLights();
-        this.optimizeShadowLights();
-    }
-    
-    private optimizeShadowLights() {
-        // Sort lights by importance (distance to player, intensity)
-        this.shadowLights.sort((a, b) => {
-            const aImportance = this.calculateLightImportance(a);
-            const bImportance = this.calculateLightImportance(b);
-            return bImportance - aImportance; // Descending order
-        });
-        
-        // Enable shadows only on the most important lights
-        this.shadowLights.forEach((light, index) => {
-            if (index < this.maxShadowLights) {
-                light.setCastShadows(true);
-            } else {
-                light.setCastShadows(false);
-            }
-        });
-    }
-    
-    private calculateLightImportance(light: Horizon.LightGizmo): number {
-        const player = Horizon.Player.getLocalPlayer();
-        if (!player) return 0;
-        
-        const distance = player.getPosition().distance(light.getPosition());
-        const intensity = light.getIntensity();
-        
-        // Closer and brighter lights are more important
-        return intensity / (distance + 1);
-    }
-}
-```
+**Critical**: Horizon Worlds enforces a **6.25 GB memory limit** per world (introduced July 2024).
 
-## Mobile Optimization
+### **Memory Limit Enforcement:**
 
-Mobile devices require special optimization strategies.
+- Worlds exceeding 6.25 GB **cannot be published**
+- Cannot add new objects/assets when limit is reached
+- Existing worlds must be optimized to stay under limit
+- System may crash worlds that exceed memory limits
 
-### Mobile-Specific Optimizations
+### **Memory Optimization Strategies:**
 
-**Mobile Lighting Controller:**
-```typescript
-class MobileLightingOptimizer extends Horizon.Component {
-    private isMobileDevice: boolean;
-    private lights: Horizon.LightGizmo[] = [];
-    private worldSettings: Horizon.WorldSettings;
-    
-    override start() {
-        this.isMobileDevice = this.detectMobileDevice();
-        this.lights = this.getLightsInScene();
-        this.worldSettings = Horizon.WorldSettings.getInstance();
-        this.optimizeForDevice();
-    }
-    
-    private detectMobileDevice(): boolean {
-        // Detect mobile device (simplified)
-        return Horizon.DeviceInfo.getDeviceType() === "mobile";
-    }
-    
-    private optimizeForDevice() {
-        if (this.isMobileDevice) {
-            this.applyMobileOptimizations();
-        } else {
-            this.applyDesktopOptimizations();
-        }
-    }
-    
-    private applyMobileOptimizations() {
-        // Reduce light count
-        this.lights.forEach((light, index) => {
-            if (index > 8) { // Limit to 8 lights on mobile
-                light.setIntensity(0);
-            } else {
-                light.setIntensity(light.getIntensity() * 0.8);
-            }
-        });
-        
-        // Disable expensive effects
-        this.worldSettings.setBloomEnabled(false);
-        this.worldSettings.setAtmosphericFogDensity(0.05);
-        
-        // Reduce shadow quality
-        this.lights.forEach(light => {
-            if (light instanceof Horizon.DirectionalLightGizmo) {
-                light.setShadowResolution(512);
-                light.setShadowDistance(25);
-                light.setShadowSoftness(1.0);
-            }
-        });
-    }
-    
-    private applyDesktopOptimizations() {
-        // Full quality for desktop/VR
-        this.worldSettings.setBloomEnabled(true);
-        this.worldSettings.setBloomIntensity(0.8);
-        
-        this.lights.forEach(light => {
-            if (light instanceof Horizon.DirectionalLightGizmo) {
-                light.setShadowResolution(2048);
-                light.setShadowDistance(100);
-                light.setShadowSoftness(0.3);
-            }
-        });
-    }
-}
-```
+**Reduce Asset Size:**
 
-### Dynamic Quality Adjustment
+- Use compressed textures appropriate for target resolution
+- Optimize 3D models (reduce polygon count)
+- Remove unused materials and textures
+- Use texture atlasing to combine materials
 
-**Adaptive Quality System:**
-```typescript
-class AdaptiveQualityController extends Horizon.Component {
-    private qualityLevel: string = "high";
-    private targetFPS: number = 60;
-    private frameTimeHistory: number[] = [];
-    
-    override start() {
-        this.startQualityMonitoring();
-    }
-    
-    private startQualityMonitoring() {
-        setInterval(() => {
-            this.updateQualityLevel();
-        }, 1000);
-    }
-    
-    private updateQualityLevel() {
-        const currentFPS = this.calculateAverageFPS();
-        
-        if (currentFPS < this.targetFPS * 0.8) {
-            this.reduceQuality();
-        } else if (currentFPS > this.targetFPS * 1.1) {
-            this.increaseQuality();
-        }
-    }
-    
-    private reduceQuality() {
-        switch (this.qualityLevel) {
-            case "high":
-                this.qualityLevel = "medium";
-                this.applyMediumQuality();
-                break;
-            case "medium":
-                this.qualityLevel = "low";
-                this.applyLowQuality();
-                break;
-        }
-    }
-    
-    private increaseQuality() {
-        switch (this.qualityLevel) {
-            case "low":
-                this.qualityLevel = "medium";
-                this.applyMediumQuality();
-                break;
-            case "medium":
-                this.qualityLevel = "high";
-                this.applyHighQuality();
-                break;
-        }
-    }
-    
-    private applyLowQuality() {
-        // Disable most lighting effects
-        this.worldSettings.setBloomEnabled(false);
-        this.worldSettings.setAtmosphericFogDensity(0.02);
-        this.reduceLightCount(4);
-        this.setShadowQuality("low");
-    }
-    
-    private applyMediumQuality() {
-        // Balanced quality
-        this.worldSettings.setBloomEnabled(true);
-        this.worldSettings.setBloomIntensity(0.4);
-        this.worldSettings.setAtmosphericFogDensity(0.1);
-        this.reduceLightCount(8);
-        this.setShadowQuality("medium");
-    }
-    
-    private applyHighQuality() {
-        // Full quality
-        this.worldSettings.setBloomEnabled(true);
-        this.worldSettings.setBloomIntensity(0.8);
-        this.worldSettings.setAtmosphericFogDensity(0.2);
-        this.reduceLightCount(15);
-        this.setShadowQuality("high");
-    }
-}
-```
+**Efficient Asset Usage:**
 
-## Troubleshooting Common Issues
+- Reuse materials across multiple objects
+- Share geometries when possible
+- Remove duplicate assets
+- Use appropriate LOD (Level of Detail) models
 
-Identify and fix common lighting performance problems.
+**Monitor Memory Usage:**
 
-### Common Performance Issues
+- Use Real-time Metrics panel to track memory
+- Set memory target alerts (e.g., 5.5 GB warning)
+- Test memory usage throughout development
+- Profile memory usage during peak activity
 
-**Light Not Visible:**
-```typescript
-class LightVisibilityDebugger extends Horizon.Component {
-    private lights: Horizon.LightGizmo[] = [];
-    
-    override start() {
-        this.lights = this.getLightsInScene();
-        this.debugLightVisibility();
-    }
-    
-    private debugLightVisibility() {
-        this.lights.forEach(light => {
-            const intensity = light.getIntensity();
-            const position = light.getPosition();
-            const range = light instanceof Horizon.PointLightGizmo ? light.getRange() : 0;
-            
-            console.log(`Light Debug: Intensity=${intensity}, Position=${position}, Range=${range}`);
-            
-            if (intensity <= 0) {
-                console.warn("Light has zero intensity - not visible");
-            }
-            
-            if (light instanceof Horizon.PointLightGizmo && range <= 0) {
-                console.warn("Point light has zero range - not visible");
-            }
-        });
-    }
-}
-```
+## Cross-Platform Optimization
 
-**Shadows Too Harsh:**
-```typescript
-class ShadowSoftnessController extends Horizon.Component {
-    private shadowLights: Horizon.LightGizmo[] = [];
-    
-    override start() {
-        this.shadowLights = this.getShadowCastingLights();
-        this.softenShadows();
-    }
-    
-    private softenShadows() {
-        this.shadowLights.forEach(light => {
-            if (light instanceof Horizon.DirectionalLightGizmo) {
-                light.setShadowSoftness(0.8);
-                light.setShadowBias(0.002);
-                light.setShadowNormalBias(0.02);
-            }
-        });
-    }
-}
-```
+Optimize for VR, mobile, and web platforms simultaneously for maximum reach.
 
-**Performance Issues:**
-```typescript
-class PerformanceTroubleshooter extends Horizon.Component {
-    override start() {
-        this.diagnosePerformanceIssues();
-    }
-    
-    private diagnosePerformanceIssues() {
-        const lightCount = this.countActiveLights();
-        const shadowCount = this.countShadowCastingLights();
-        const fps = this.getCurrentFPS();
-        
-        console.log(`Performance Diagnosis: FPS=${fps}, Lights=${lightCount}, Shadows=${shadowCount}`);
-        
-        if (fps < 30) {
-            console.error("Low frame rate detected!");
-            
-            if (lightCount > 15) {
-                console.warn("Too many lights - consider reducing light count");
-            }
-            
-            if (shadowCount > 4) {
-                console.warn("Too many shadow-casting lights - consider reducing shadow count");
-            }
-            
-            this.suggestOptimizations();
-        }
-    }
-    
-    private suggestOptimizations() {
-        console.log("Suggested optimizations:");
-        console.log("1. Reduce light count to 10 or fewer");
-        console.log("2. Limit shadow-casting lights to 2-3");
-        console.log("3. Reduce shadow resolution");
-        console.log("4. Disable bloom and atmospheric effects");
-        console.log("5. Implement light culling");
-    }
-}
-```
+### **Platform-Specific Targets:**
 
-### Best Practices Summary
+| Platform       | FPS Target | Primary Considerations                    |
+| -------------- | ---------- | ----------------------------------------- |
+| **VR (Quest)** | 72 FPS     | High performance, comfort, 6 GB RAM       |
+| **Web**        | 60 FPS     | Varies by browser and hardware            |
+| **Mobile**     | 30+ FPS    | Limited processing power, touch interface |
+
+### **Cross-Platform Design Principles:**
+
+**Performance Scaling:**
+
+- Design for lowest common denominator (mobile)
+- Use Environment Gizmo presets that work across platforms
+- Minimize dynamic lights (20 maximum limit affects all platforms)
+- Keep draw calls low through material batching
+
+**Interface Considerations:**
+
+- Text must be legible on mobile screens
+- Touch-friendly interaction areas
+- Screen-based UI for important information
+- VFX and audio cues for non-text communication
+
+**Discovery Benefits:**
+
+- Mobile-optimized worlds get **priority in discovery**
+- Cross-platform worlds reach wider audiences
+- Mobile/web players can play with VR players
+
+## Mobile and Web Optimization
+
+Mobile and web platforms require specific optimization strategies.
+
+### **Mobile-Specific Optimizations:**
+
+**Visual Quality Adjustments:**
+
+- Use simpler Environment Gizmo presets
+- Reduce fog density (lower values like 0.02-0.05)
+- Minimize particle effects
+- Use fewer dynamic lights
+- Optimize texture sizes for mobile screens
+
+**Interface Design:**
+
+- Large, touch-friendly interaction areas
+- Clear visual feedback for touch interactions
+- Screen-based UI for critical information
+- Avoid relying solely on spatial audio cues
+
+**Performance Considerations:**
+
+- Target 30+ FPS minimum on mobile
+- Monitor memory usage more closely
+- Test on actual mobile devices
+- Consider slower mobile processors
+
+### **Web Optimization:**
+
+**Browser Compatibility:**
+
+- **Supported**: Chrome, Safari, Edge
+- **Not Supported**: Firefox
+- Test across supported browsers
+- Account for varying hardware capabilities
+
+**Performance Targets:**
+
+- 60 FPS target for web
+- Variable performance based on user hardware
+- Optimize for integrated graphics
+- Consider network bandwidth for assets
+
+### **Mobile Discovery Advantages:**
+
+Mobile-optimized worlds receive:
+
+- **Enhanced discovery placement**
+- **"Jump back in" shelf** visibility
+- **Direct world search** functionality
+- **Cross-platform session continuity**
+
+## Performance Troubleshooting
+
+Common performance issues and their solutions.
+
+### **Low FPS Diagnosis:**
+
+**Step 1: Check Real-time Metrics**
+
+- Open metrics panel (Utilities menu in VR, P key on web)
+- Identify which metric is exceeding targets
+
+**Step 2: Common Issues and Solutions**
+
+| Issue           | Likely Cause               | Solution                                    |
+| --------------- | -------------------------- | ------------------------------------------- |
+| High CPU time   | Too many scripts/physics   | Optimize TypeScript, reduce physics objects |
+| High GPU time   | Complex geometry/materials | Reduce polygons, optimize textures          |
+| Low Phase Sync  | Multiple bottlenecks       | Address CPU and GPU issues first            |
+| High Memory     | Too many/large assets      | Remove unused assets, compress textures     |
+| High Draw Calls | Too many materials         | Batch materials, use texture atlasing       |
+| High Vertices   | Complex geometry           | Use LOD models, reduce polygon count        |
+
+### **Memory Issues:**
+
+**Symptoms:**
+
+- Cannot add new objects
+- Cannot publish world
+- World crashes during play
+
+**Solutions:**
+
+- Delete unused assets
+- Compress existing textures
+- Reduce polygon count on models
+- Remove duplicate materials
+- Use invisible glow objects instead of additional dynamic lights
+
+### **Cross-Platform Issues:**
+
+**Mobile Performance Problems:**
+
+- Reduce environmental complexity
+- Use simpler Environment Gizmo presets
+- Minimize dynamic effects
+- Test on actual mobile devices
+
+**Web Browser Issues:**
+
+- Check browser compatibility (Chrome, Safari, Edge only)
+- Optimize for integrated graphics
+- Reduce asset sizes for faster loading
+
+## Best Practices
+
+### **Performance Development Workflow:**
+
+1. **Monitor Throughout Development**
+
+   - Check Real-time Metrics regularly
+   - Set memory alerts at 5.5 GB
+   - Test on target platforms frequently
+
+2. **Optimize Early and Often**
+
+   - Profile performance during development
+   - Address issues as they arise
+   - Don't wait until final testing
+
+3. **Test Across Platforms**
+   - VR testing for primary experience
+   - Web testing for browser compatibility
+   - Mobile testing (actual devices when possible)
+
+### **Asset Management:**
 
 **Do's ✅**
-- Monitor performance metrics regularly
-- Use light culling for distant lights
-- Implement LOD for lighting quality
-- Limit shadow-casting lights
-- Optimize for mobile devices
-- Test on target hardware
+
+- Compress textures appropriately
+- Reuse materials and geometries
+- Use texture atlasing for small textures
+- Remove unused assets regularly
+- Monitor memory usage constantly
 
 **Don'ts ❌**
-- Don't use too many lights simultaneously
-- Don't enable shadows on all lights
-- Don't ignore mobile performance
-- Don't use high-quality effects on low-end devices
-- Don't forget to test in VR
 
-### Performance Checklist
+- Don't exceed 6.25 GB memory limit
+- Don't use excessive dynamic lights (20 max)
+- Don't ignore mobile performance
+- Don't rely on fictional performance APIs
+- Don't over-optimize at expense of core experience
+
+### **Platform Optimization Checklist:**
 
 **Before Publishing:**
-- [ ] Frame rate is 60+ FPS on desktop, 30+ on mobile
-- [ ] Light count is under 15 total
-- [ ] Shadow-casting lights limited to 4 or fewer
-- [ ] Bloom and atmospheric effects optimized
-- [ ] Mobile-specific optimizations applied
-- [ ] Performance tested on target devices
+
+- [ ] FPS targets met: 72 (VR), 60 (Web), 30+ (Mobile)
+- [ ] Memory usage under 6.25 GB limit
+- [ ] Real-time Metrics show healthy performance
+- [ ] Cross-platform testing completed
+- [ ] Mobile text legibility confirmed
+- [ ] Touch interactions work properly
+- [ ] Works in supported browsers (Chrome, Safari, Edge)
+
+### **Common Mistakes to Avoid:**
+
+1. **Trying to create custom performance monitoring** - Use built-in Real-time Metrics panel
+2. **Ignoring memory limits** - 6.25 GB is a hard limit, plan accordingly
+3. **Not testing on mobile** - Mobile optimization requires actual device testing
+4. **Using fictional APIs** - No WorldSettings class or custom monitoring systems exist
+5. **Optimizing too late** - Monitor performance throughout development
+
+### **Discovery and Reach:**
+
+**Mobile-First Benefits:**
+
+- Priority placement in discovery surfaces
+- Access to "Jump back in" shelf
+- Direct world search functionality
+- Broader audience reach
+- Cross-platform play sessions
+
+**Optimization ROI:**
+
+- Mobile optimization = better discovery
+- Better discovery = more players
+- More players = better community feedback
+- Cross-platform compatibility = maximum reach
+
+## Advanced Optimization Techniques
+
+### **Memory Optimization:**
+
+**Asset Streaming:**
+
+- Load assets as needed (if using custom scripts)
+- Remove objects from scenes when not needed
+- Use object pooling for repeated elements
+
+**Texture Optimization:**
+
+- Use appropriate texture sizes for target screens
+- Compress textures without visible quality loss
+- Use texture atlasing for UI elements
+- Remove unused texture channels
+
+### **Performance Profiling:**
+
+**Systematic Approach:**
+
+1. Establish baseline metrics in empty world
+2. Add content incrementally
+3. Monitor impact of each addition
+4. Address issues before adding more content
+5. Test final optimization on all platforms
+
+**Bottleneck Identification:**
+
+- CPU bound: Optimize scripts, reduce physics
+- GPU bound: Reduce geometry complexity, optimize materials
+- Memory bound: Remove assets, compress textures
+- Mixed: Address highest impact issues first
+
+## Next Steps
+
+After implementing these optimizations:
+
+1. **Regular Monitoring**: Check performance metrics weekly
+2. **Community Testing**: Get feedback from players on different platforms
+3. **Iterative Improvement**: Continuously optimize based on real-world usage
+4. **Platform Updates**: Stay informed about Horizon Worlds platform changes
+5. **Best Practice Sharing**: Share successful optimization strategies with community
 
 ---
 
-**Ready to Optimize Your Lighting?**
+**Ready to Optimize Your World?**
 
-Use these optimization techniques to create beautiful lighting that performs well on all devices. Remember to test your optimizations thoroughly and monitor performance in real-world conditions.
+Focus on using the actual tools available in Horizon Worlds rather than fictional APIs. The Real-time Metrics panel provides all the data you need to create high-performing, cross-platform experiences that reach the widest possible audience.
 
-**Next Steps:**
-1. Implement light culling in your world
-2. Add performance monitoring
-3. Create mobile-specific optimizations
-4. Test on various devices and hardware
+**Remember**: The 6.25 GB memory limit and 20 dynamic light limit are hard constraints. Plan your world design around these limitations from the beginning rather than trying to optimize later.
 
 ---
 
-*This tutorial is part of the Horizon Worlds Creator Documentation. For more tutorials and resources, visit the [main documentation hub](https://github.com/MHCPCreators/worlds-documentation).*
+_This guide reflects the actual capabilities and limitations of Meta Horizon Worlds as of 2025. For the latest updates and features, visit the [official Horizon Worlds documentation](https://developers.meta.com/horizon-worlds/)._
