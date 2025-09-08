@@ -47,3 +47,15 @@ Outline: conceptual differences, versioning, creating a template, instancing & o
 # TODO
 
 - Asset Template -> Blender -> Disco Ball -> Best monetization tutorial ??
+
+
+
+Bloom -> Car tavelling towards man
+Lense flare -> Eclipse
+Sun Rise -> 
+
+God Rays
+
+Fake Lightmaps
+
+Volumetric Fog
