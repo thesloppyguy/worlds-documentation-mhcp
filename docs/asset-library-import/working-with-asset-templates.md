@@ -8,7 +8,7 @@ September 4, 2025
 
 ## Introduction
 
-This tutorial will walk you through **using Asset Templates in Horizon Worlds**, focusing on a practical example: **creating reusable street lights that can are toggled when a user in within a certain area**.
+This tutorial will walk you through **using Asset Templates in Horizon Worlds**, focusing on a practical example: **creating reusable street lights that can are toggled when a user in within a certain area and starts changing light**.
 
 By the end, you’ll understand:
 
@@ -73,8 +73,6 @@ Now let’s build an interactive street light using Asset Templates.
    4. Add a Light Gizmo to the Bulb. (we are using dynamic lights for spot lights but you should use static for better performance)
 2. Add an Empty Block for Trigger Controller for managing Light state.
 3. Add a Toggle Area for users to interact with the light.
-4. Group them into an **Asset Template** (right-click → Create Asset → choose Template).
-5. Rename it “Street Light”.
 
 ### Step 2 – Add the Script
 
@@ -82,26 +80,193 @@ Here’s a simple **File-Backed Script (FBS)** for toggling the light:
 
 ```typescript
 // Trigger Broadcast Script
+import { Component, PropTypes, NetworkEvent, CodeBlockEvents, Player, Entity } from 'horizon/core';
+
+// Define the network events. These should match the event names used by any receiving scripts.
+const PlayerEntered = new NetworkEvent('PlayerEntered');
+const PlayerExited = new NetworkEvent('PlayerExited');
+
+export class TriggerBroadcaster extends Component<typeof TriggerBroadcaster> {
+  static propsDefinition = {
+    // The entity that will receive the network events.
+    target: { type: PropTypes.Entity },
+  };
+
+  private playerCount: number = 0;
+
+  override preStart() {
+    // Connect to the trigger event that fires when a player enters.
+    this.connectCodeBlockEvent(
+      this.entity,
+      CodeBlockEvents.OnPlayerEnterTrigger,
+      (player: Player) => {
+        this.handlePlayerEnter(player);
+      }
+    );
+
+    // Connect to the trigger event that fires when a player exits.
+    this.connectCodeBlockEvent(
+      this.entity,
+      CodeBlockEvents.OnPlayerExitTrigger,
+      (player: Player) => {
+        this.handlePlayerExit(player);
+      }
+    );
+  }
+
+  override start() {
+    // No initialization needed in start for this script.
+  }
+
+  private handlePlayerEnter(player: Player) {
+    this.playerCount++;
+
+    // If this is the first player to enter the trigger, send the event.
+    if (this.playerCount === 1) {
+      if (this.props.target) {
+        this.sendNetworkEvent(this.props.target, PlayerEntered, {});
+      } else {
+        console.error("TriggerBroadcaster: 'target' prop is not set.");
+      }
+    }
+  }
+
+  private handlePlayerExit(player: Player) {
+    this.playerCount--;
+
+    // If this was the last player to leave the trigger, send the event.
+    if (this.playerCount === 0) {
+      if (this.props.target) {
+        this.sendNetworkEvent(this.props.target, PlayerExited, {});
+      } else {
+        console.error("TriggerBroadcaster: 'target' prop is not set.");
+      }
+    }
+  }
+}
+
+Component.register(TriggerBroadcaster);
 ```
 
 ```typescript
 // Trigger Handler Script
+import { Component, PropTypes, NetworkEvent, DynamicLightGizmo, Color } from 'horizon/core';
+
+// Define the network events. These should match the events sent by the trigger script.
+const PlayerEntered = new NetworkEvent('PlayerEntered');
+const PlayerExited = new NetworkEvent('PlayerExited');
+
+export class LightColorChanger extends Component<typeof LightColorChanger> {
+  static propsDefinition = {
+    // The light entity that will change color.
+    light: { type: PropTypes.Entity },
+  };
+
+  private originalColor?: Color;
+  private lastColor?: Color;
+  private colorChangeInterval?: number;
+
+  override preStart() {
+    // Listen for the 'PlayerEntered' network event to start the color changes.
+    this.connectNetworkEvent(this.entity, PlayerEntered, () => {
+      this.startColorChange();
+    });
+
+    // Listen for the 'PlayerExited' network event to stop the color changes.
+    this.connectNetworkEvent(this.entity, PlayerExited, () => {
+      this.stopColorChange();
+    });
+  }
+
+  override start() {
+    if (this.props.light) {
+      const lightGizmo = this.props.light.as(DynamicLightGizmo);
+      if (lightGizmo) {
+        // Store the original color of the light when the script starts.
+        this.originalColor = lightGizmo.color.get();
+      } else {
+        console.error("StaticLightChanger: The provided 'light' entity is not a DynamicLightGizmo.");
+      }
+    } else {
+      console.error("StaticLightChanger: 'light' prop is not set.");
+    }
+  }
+
+  private startColorChange() {
+    // Clear any existing interval to prevent duplicates.
+    if (this.colorChangeInterval) {
+      this.async.clearInterval(this.colorChangeInterval);
+    }
+
+    // Start a new interval to change the color every 1 second.
+    this.colorChangeInterval = this.async.setInterval(() => {
+      this.setRandomColor();
+    }, 1000);
+  }
+
+  private stopColorChange() {
+    // Clear the interval.
+    if (this.colorChangeInterval) {
+      this.async.clearInterval(this.colorChangeInterval);
+      this.colorChangeInterval = undefined;
+    }
+    // Freeze on the last color instead of restoring original color.
+    this.freezeOnLastColor();
+  }
+
+  private setRandomColor() {
+    if (!this.props.light) return;
+
+    const lightGizmo = this.props.light.as(DynamicLightGizmo);
+    if (lightGizmo) {
+      // Create a new random color.
+      const randomColor = new Color(Math.random(), Math.random(), Math.random());
+      lightGizmo.color.set(randomColor);
+      // Store the last color for freezing when player exits.
+      this.lastColor = randomColor;
+    }
+  }
+
+  private freezeOnLastColor() {
+    if (!this.props.light || !this.lastColor) return;
+
+    const lightGizmo = this.props.light.as(DynamicLightGizmo);
+    if (lightGizmo) {
+      // Freeze on the last color that was set.
+      lightGizmo.color.set(this.lastColor);
+    }
+  }
+
+  override dispose() {
+    // Ensure the interval is cleared if the component is destroyed.
+    if (this.colorChangeInterval) {
+      this.async.clearInterval(this.colorChangeInterval);
+    }
+  }
+}
+
+Component.register(LightColorChanger);
 ```
 
-### Step 3 - Attach Script and Test
+### Step 3 - Create Template
+
+1. Group them into an **Asset Template** (right-click → Create Asset → choose Template).
+2. Rename it “Street Light”.
+
+### Step 4 - Attach Script and Test
 
 1. Attach Trigger Broadcast Script to the Trigger and provide the Controller block as an argument.
 2. Attach Handler Script to the Controller Block and provide the Light Gizmo as an argument.
 3. Press P and the Test out the interaction and performance.
 
-### Step 4 – Publish the Template and Spawn a Clone
+### Step 5 – Publish the Template and Spawn a Clone
 
 1. Edit the template definition and description.
 2. Save → Publish.
 3. Go to your Templates and Find the asset.
 4. Drag and Place the Asset and test the same.
 
-### Step 5 – Property Overrides
+### Step 6 – Property Overrides
 
 Want different colored lights?
 
@@ -109,7 +274,7 @@ Want different colored lights?
 2. Override the **light color property** on each one (blue dot means override).
 3. Overrides stay even if you later update the script.
 
-### Step 6 - Version Control
+### Step 7 - Version Control
 
 1. For every change you are prompted with notes asking if you want to publish the same.
 2. It is up to you what changes you would like to push across all your instance and Worlds
@@ -120,7 +285,7 @@ Want different colored lights?
 
 ---
 
-## Topic Three: Future Steps and Exercise.
+## Topic Three: Future Steps and Exercise
 
 Now that you have the basics down Here is a sample exercise for you.
 
